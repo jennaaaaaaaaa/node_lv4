@@ -2,6 +2,7 @@ import express from 'express';
 import { prisma } from '../utils/prisma/index.js';
 import Joi from 'joi';
 import imageUploader from '../../assets/imageupload.js';
+import authMiddleware from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -15,13 +16,16 @@ const menuSchema = Joi.object({
 });
 
 //메뉴 등록
-router.post('/categories/:categoryId/menus', imageUploader.single('image'), async (req, res, next) => {
+router.post('/categories/:categoryId/menus', authMiddleware, imageUploader.single('image'), async (req, res, next) => {
    try {
+      const { userId } = req.user;
+      if (req.user.userType !== 'OWNER') throw { name: 'ApiOnlyOwnerCanUse' };
+
       const { categoryId } = req.params;
 
       if (categoryId === undefined) throw { name: 'ValidationError' };
 
-      const category = await prisma.category.findFirst({ where: { id: +categoryId } });
+      const category = await prisma.categories.findFirst({ where: { categoryId: +categoryId } });
       if (!category) throw { name: 'CastError' };
 
       const validation = await menuSchema.validateAsync(req.body);
@@ -34,7 +38,7 @@ router.post('/categories/:categoryId/menus', imageUploader.single('image'), asyn
          throw { name: 'LessThenZero' };
       }
 
-      const lastOrder = await prisma.menu.findFirst({
+      const lastOrder = await prisma.menus.findFirst({
          orderBy: {
             order: 'desc',
          },
@@ -45,15 +49,24 @@ router.post('/categories/:categoryId/menus', imageUploader.single('image'), asyn
 
       const orderCheck = lastOrder ? lastOrder.order + 1 : 1;
 
-      await prisma.menu.create({
+      await prisma.menus.create({
          data: {
             name,
             description,
             image: req.file.location,
-            price,
+            price: +price,
             status: 'FOR_SALE',
             order: orderCheck,
-            category_id: +categoryId,
+            Category: {
+               connect: {
+                  categoryId: +categoryId,
+               },
+            },
+            User: {
+               connect: {
+                  userId: userId,
+               },
+            },
          },
       });
 
@@ -70,11 +83,11 @@ router.get('/categories/:categoryId/menus', async (req, res, next) => {
 
       if (!categoryId) throw { name: 'ValidationError' };
 
-      const category = await prisma.category.findFirst({ where: { id: +categoryId } });
+      const category = await prisma.categories.findFirst({ where: { categoryId: +categoryId } });
 
       if (!category) throw { name: 'CastError' };
 
-      const menus = await prisma.menu.findMany({ where: { category_id: +categoryId } });
+      const menus = await prisma.menus.findMany({ where: { CategoryId: +categoryId } });
 
       return res.status(200).json({ menus });
    } catch (error) {
@@ -90,20 +103,25 @@ router.get('/categories/:categoryId/menus/:menuId', async (req, res, next) => {
          throw { name: 'ValidationError' };
       }
 
-      const category = await prisma.category.findFirst({ where: { id: +categoryId } });
+      const category = await prisma.categories.findFirst({ where: { categoryId: +categoryId } });
 
       if (!category) throw { name: 'CastError' };
 
-      const menu = await prisma.menu.findFirst({
-         where: { id: +menuId },
+      const menu = await prisma.menus.findFirst({
+         where: { menuId: +menuId },
          select: {
-            id: true,
+            menuId: true,
             name: true,
             description: true,
             image: true,
             price: true,
             order: true,
             status: true,
+            // Category: {
+            //    connect: {
+            //       categoryId: +categoryId,
+            //    },
+            // },
          },
       });
 
@@ -114,14 +132,15 @@ router.get('/categories/:categoryId/menus/:menuId', async (req, res, next) => {
 });
 
 //수정
-router.patch('/categories/:categoryId/menus/:menuId', async (req, res, next) => {
+router.patch('/categories/:categoryId/menus/:menuId', authMiddleware, async (req, res, next) => {
    try {
+      if (req.user.userType !== 'OWNER') throw { name: 'ApiOnlyOwnerCanUse' };
       const { categoryId, menuId } = req.params;
 
-      const category = await prisma.categories.findFirst({ where: { id: +categoryId } });
+      const category = await prisma.categories.findFirst({ where: { categoryId: +categoryId } });
       if (!category) throw { name: 'CastError' };
 
-      const menu = await prisma.menus.findFirst({ where: { id: +menuId } });
+      const menu = await prisma.menus.findFirst({ where: { menuId: +menuId } });
       if (!menu) throw { name: 'menuCastError' };
 
       const validation = await menuSchema.validateAsync(req.body);
@@ -147,7 +166,7 @@ router.patch('/categories/:categoryId/menus/:menuId', async (req, res, next) => 
 
       await prisma.menus.update({
          where: { menuId: +menuId },
-         data: { name, description, price, order, status },
+         data: { name, description, price: +price, order, status },
       });
       return res.status(200).json({ message: '메뉴를 수정하였습니다.' });
    } catch (error) {
@@ -156,21 +175,22 @@ router.patch('/categories/:categoryId/menus/:menuId', async (req, res, next) => 
 });
 
 //삭제
-router.delete('/categories/:categoryId/menus/:menuId', async (req, res, next) => {
+router.delete('/categories/:categoryId/menus/:menuId', authMiddleware, async (req, res, next) => {
    try {
+      if (req.user.userType !== 'OWNER') throw { name: 'ApiOnlyOwnerCanUse' };
       const { categoryId, menuId } = req.params;
 
       if (!categoryId || !menuId) {
          throw { name: 'ValidationError' };
       }
 
-      const category = await prisma.category.findFirst({ where: { id: +categoryId } });
+      const category = await prisma.categories.findFirst({ where: { categoryId: +categoryId } });
       if (!category) throw { name: 'CastError' };
 
-      const menu = await prisma.menu.findFirst({ where: { id: +menuId } });
+      const menu = await prisma.menus.findFirst({ where: { menuId: +menuId } });
       if (!menu) throw { name: 'menuCastError' };
 
-      await prisma.menu.delete({ where: { id: +menuId } });
+      await prisma.menus.delete({ where: { menuId: +menuId } });
 
       return res.status(200).json({ message: '메뉴를 삭제하였습니다' });
    } catch (error) {
