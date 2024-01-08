@@ -34,7 +34,6 @@ router.post('/categories/:categoryId/menus', imageUploader.single('image'), asyn
          throw { name: 'LessThenZero' };
       }
 
-
       const lastOrder = await prisma.menu.findFirst({
          orderBy: {
             order: 'desc',
@@ -119,10 +118,10 @@ router.patch('/categories/:categoryId/menus/:menuId', async (req, res, next) => 
    try {
       const { categoryId, menuId } = req.params;
 
-      const category = await prisma.category.findFirst({ where: { id: +categoryId } });
+      const category = await prisma.categories.findFirst({ where: { id: +categoryId } });
       if (!category) throw { name: 'CastError' };
 
-      const menu = await prisma.menu.findFirst({ where: { id: +menuId } });
+      const menu = await prisma.menus.findFirst({ where: { id: +menuId } });
       if (!menu) throw { name: 'menuCastError' };
 
       const validation = await menuSchema.validateAsync(req.body);
@@ -135,19 +134,19 @@ router.patch('/categories/:categoryId/menus/:menuId', async (req, res, next) => 
       }
 
       //body에 입력한 order값을 데이터베이스에서 이미 존재하는 값인지 찾음
-      const checkExistsOrder = await prisma.menu.findFirst({ where: { order: order } });
+      const checkExistsOrder = await prisma.menus.findFirst({ where: { order: order } });
       //이미 다른 메뉴로 존재하는 값이라면
       // 찾은 checkExistsOrder 데이터의 id로 찾아서 찾은 메뉴품목의 order 값을
       // 현재 위에서 params로 받은 menuId로 찾은 menu값의 order 값으로 값을 수정해줌
       if (checkExistsOrder) {
-         await prisma.menu.update({
-            where: { id: checkExistsOrder.id },
+         await prisma.menus.update({
+            where: { menuId: checkExistsOrder.menuId },
             data: { order: menu.order },
          });
       }
 
-      await prisma.menu.update({
-         where: { id: +menuId },
+      await prisma.menus.update({
+         where: { menuId: +menuId },
          data: { name, description, price, order, status },
       });
       return res.status(200).json({ message: '메뉴를 수정하였습니다.' });
@@ -180,4 +179,3 @@ router.delete('/categories/:categoryId/menus/:menuId', async (req, res, next) =>
 });
 
 export default router;
-

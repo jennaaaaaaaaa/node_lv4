@@ -2,39 +2,69 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+provider = "mysql"
+url      = env("DATABASE_URL")
 }
 
-model Category {
-  id    Int     @id @default(autoincrement()) 
-  order Int     @unique
-  name  String  
+model Users {
+userId   Int       @id @default(autoincrement()) @map("user_id")
+nickname String    @unique @map("nickname")
+password String    @map("password")
+userType User_Type @default(CUSTOMER) @map("user_type")
 
-  Menus Menu[]
-  // 카테고리 테이블과 1:N 관계.
+createdAt DateTime @default(now()) @map("createdAt")
+updatedAt DateTime @updatedAt @map("updatedAt")
+
+Categories Categories[]
+Menus Menus[]
+
+@@map("Users")
 }
 
-model Menu {
-  id              Int      @id @default(autoincrement()) 
-  category_id     Int      
-  name            String   
-  order           Int    
-  description     String 
-  image           String 
-  price           String 
-  status          Menu_Status @default(FOR_SALE)
+model Categories {
+categoryId   Int     @id @default(autoincrement()) @map("category_id")
+UserId       Int     @map("User_id")
+order        Int     @map("order")
+name         String  @map("name")
 
-  Category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
-  // 카테고리를 외래키로 참조 (메뉴테이블에 있는 category_id를 카테고리테이블에 있는 id로 참조 하고 cascade옵션 추가)
+updatedAt DateTime @updatedAt @map("updatedAt")
+
+Menus Menus[]
+User Users @relation(fields: [UserId], references: [userId], onDelete: Cascade)
+
+@@map("Categories")
+}
+
+model Menus {
+menuId          Int        @id @default(autoincrement()) @map("menu_id")
+CategoryId      Int      @map("Category_id")
+UserId          Int      @map("User_id")
+name            String   @map("menu_name")
+order           Int      @map("menu_order")
+description     String   @map("description") @db.Text
+image           String   @map("menu_image")
+price           Int      @map("price")
+status          Menu_Status @default(FOR_SALE) @map("status")
+
+updatedAt DateTime @updatedAt @map("updatedAt")
+
+// 카테고리를 외래키로 참조 (메뉴테이블에 있는 category_id를 카테고리테이블에 있는 id로 참조 하고 cascade옵션 추가)
+Category Categories @relation(fields: [CategoryId], references: [categoryId], onDelete: Cascade)
+User Users @relation(fields: [UserId], references: [userId], onDelete: Cascade)
+
+@@map("Menus")
 }
 
 enum Menu_Status {
-  FOR_SALE
-  SOLD_OUT
+FOR_SALE
+SOLD_OUT
 }
 
+enum User_Type {
+OWNER
+CUSTOMER
+}
